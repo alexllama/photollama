@@ -6,6 +6,10 @@ reading the active theme's colors at runtime.
 
 The inspiration for this app is Gwenview, but I wanted it to have the ability to rotate to any angle. Also I tend to have issues with right and left arrow sometimes skipping two images at one time. 
 
+## Screenshot
+
+![Photollama showing an image, the vertical Edit & View toolbar, and the status bar](piraguero.png)
+
 ## Features
 
 - **Formats** — JPEG, PNG, GIF, WebP, TIFF, BMP, ICO, JPEG-2000, PDF and SVG
