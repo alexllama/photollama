@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=Photollama
+GenericName=Image Viewer
+Comment=Fast, themeable image viewer
+Exec=@BIN@ %U
+Icon=photollama
+Terminal=false
+Categories=Graphics;Viewer;2DGraphics;
+MimeType=image/jpeg;image/png;image/gif;image/webp;image/tiff;image/bmp;image/x-icon;image/svg+xml;image/jp2;image/x-portable-pixmap;image/x-portable-bitmap;
+Keywords=image;viewer;photo;picture;jpeg;png;gif;webp;
+StartupNotify=true
+StartupWMClass=photollama
