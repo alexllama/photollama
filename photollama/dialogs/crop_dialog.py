@@ -46,6 +46,7 @@ class CropView(QGraphicsView):
         self._mode: str | None = None
         self._start = QPoint()
         self._orig = QRectF(self._crop)
+        self._anchor_scene = QPointF()
         self._scene.setSceneRect(QRectF(0, 0, self._w, self._h))
         self.fitInView(self._scene.sceneRect(), Qt.KeepAspectRatio)
 
@@ -55,7 +56,7 @@ class CropView(QGraphicsView):
         else:
             self._aspect = aspect
         if self._aspect:
-            self._crop = self._apply_aspect_to(QRectF(self._crop))
+            self._crop = self._fit_aspect(self._crop)
         self._crop = self._clamp(self._crop)
         self.viewport().update()
 
@@ -104,6 +105,7 @@ class CropView(QGraphicsView):
         self._orig = QRectF(self._crop)
         if self._mode == "new":
             scene_pos = self.mapToScene(pos)
+            self._anchor_scene = scene_pos
             self._crop = QRectF(scene_pos, scene_pos)
         self.viewport().update()
 
@@ -116,12 +118,9 @@ class CropView(QGraphicsView):
             delta = scene_pos - self.mapToScene(self._start)
             self._crop = self._clamp(QRectF(self._orig).translated(delta))
         elif self._mode == "new":
-            rect = QRectF(self.mapToScene(self._start), scene_pos).normalized()
-            if self._aspect:
-                rect = self._apply_aspect_to(rect)
-            self._crop = self._clamp(rect)
+            self._crop = self._clamp(self._rect_from_anchor(self._anchor_scene, scene_pos))
         else:
-            self._resize(self._mode, scene_pos)
+            self._crop = self._clamp(self._resize(self._mode, scene_pos))
         self.viewport().update()
 
     def mouseReleaseEvent(self, event):
@@ -130,42 +129,102 @@ class CropView(QGraphicsView):
         self._mode = None
         self.viewport().update()
 
-    def _resize(self, handle: str, scene_pos: QPointF) -> None:
+    def _resize(self, handle: str, scene_pos: QPointF) -> QRectF:
         x = min(max(scene_pos.x(), 0.0), float(self._w))
         y = min(max(scene_pos.y(), 0.0), float(self._h))
-        rect = QRectF(self._crop)
+        rect = QRectF(self._crop).normalized()
+        left, top, right, bottom = rect.left(), rect.top(), rect.right(), rect.bottom()
         if "l" in handle:
-            rect.setLeft(x)
+            left = x
         if "r" in handle:
-            rect.setRight(x)
+            right = x
         if "t" in handle:
-            rect.setTop(y)
+            top = y
         if "b" in handle:
-            rect.setBottom(y)
-        rect = rect.normalized()
+            bottom = y
+        rect = QRectF(
+            QPointF(min(left, right), min(top, bottom)),
+            QPointF(max(left, right), max(top, bottom)),
+        )
         if self._aspect:
             rect = self._apply_aspect_to(rect, handle)
-        self._crop = self._clamp(rect)
+        return rect
 
-    def _apply_aspect_to(self, rect: QRectF, handle: str | None = None) -> QRectF:
+    def _apply_aspect_to(self, rect: QRectF, handle: str) -> QRectF:
         aspect = self._aspect
-        if not aspect or rect.height() <= 0 or rect.width() <= 0:
+        if not aspect:
             return rect
+        if handle == "br":
+            ax, ay = rect.left(), rect.top()
+        elif handle == "tl":
+            ax, ay = rect.right(), rect.bottom()
+        elif handle == "tr":
+            ax, ay = rect.left(), rect.bottom()
+        elif handle == "bl":
+            ax, ay = rect.right(), rect.top()
+        elif handle == "r":
+            ax, ay = rect.left(), rect.center().y()
+        elif handle == "l":
+            ax, ay = rect.right(), rect.center().y()
+        elif handle == "b":
+            ax, ay = rect.center().x(), rect.top()
+        else:
+            ax, ay = rect.center().x(), rect.bottom()
+
+        if handle in ("l", "r", "tl", "tr", "bl", "br"):
+            by_width = (rect.width(), rect.width() / aspect)
+            by_height = (rect.height() * aspect, rect.height())
+            width, height = by_width if by_width[0] * by_width[1] >= by_height[0] * by_height[1] else by_height
+        else:
+            width, height = rect.height() * aspect, rect.height()
+
+        width = max(width, 1.0)
+        height = max(height, 1.0)
+        if handle == "br":
+            x, y = ax, ay
+        elif handle == "bl":
+            x, y = ax - width, ay
+        elif handle == "tr":
+            x, y = ax, ay - height
+        elif handle == "tl":
+            x, y = ax - width, ay - height
+        elif handle == "r":
+            x, y = ax, ay - height / 2
+        elif handle == "l":
+            x, y = ax - width, ay - height / 2
+        elif handle == "b":
+            x, y = ax - width / 2, ay
+        else:
+            x, y = ax - width / 2, ay - height
+        return QRectF(x, y, width, height)
+
+    def _rect_from_anchor(self, anchor: QPointF, current: QPointF) -> QRectF:
+        if not self._aspect:
+            return QRectF(anchor, current).normalized()
+        aspect = self._aspect
+        dx = abs(current.x() - anchor.x())
+        dy = abs(current.y() - anchor.y())
+        if dx >= dy * aspect:
+            width = max(dx, 1.0)
+            height = width / aspect
+        else:
+            height = max(dy, 1.0)
+            width = height * aspect
+        x = anchor.x() if current.x() >= anchor.x() else anchor.x() - width
+        y = anchor.y() if current.y() >= anchor.y() else anchor.y() - height
+        return QRectF(x, y, width, height)
+
+    def _fit_aspect(self, rect: QRectF) -> QRectF:
+        aspect = self._aspect
+        if not aspect:
+            return QRectF(rect)
         center = rect.center()
-        width = rect.width()
+        width = min(rect.width(), float(self._w))
         height = width / aspect
         if height > self._h:
-            height = self._h
+            height = float(self._h)
             width = height * aspect
-        if width > self._w:
-            width = self._w
-            height = width / aspect
-        if handle in ("t", "b") or (handle is None and rect.height() > rect.width()):
-            width = rect.height() * aspect
-            height = rect.height()
-        return QRectF(
-            center.x() - width / 2, center.y() - height / 2, width, height
-        )
+        return QRectF(center.x() - width / 2, center.y() - height / 2, width, height)
 
     def _clamp(self, rect: QRectF) -> QRectF:
         rect = rect.normalized()

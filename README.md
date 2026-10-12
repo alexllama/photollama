@@ -53,7 +53,7 @@ This writes:
 
 - `~/.local/bin/photollama` — a launcher that runs the app from this checkout
 - `~/.local/share/applications/photollama.desktop`
-- `~/.local/share/icons/hicolor/scalable/apps/photollama.svg`
+- `~/.local/share/icons/hicolor/*/apps/photollama.png` (16–256 px)
 - `xdg-mime` defaults for JPEG, PNG, GIF, WebP, TIFF, BMP, SVG, ICO and JP2
 
 To uninstall, remove those files and reset the MIME defaults with your previous

@@ -232,6 +232,54 @@ class MainWindow(QMainWindow):
         self.setStyleSheet(self.theme.stylesheet())
         self.canvas.apply_theme()
 
+    def closeEvent(self, event):
+        if self._confirm_unsaved():
+            event.accept()
+        else:
+            event.ignore()
+
+    def _confirm_unsaved(self) -> bool:
+        modified = [doc for doc in self._docs.values() if doc.is_modified]
+        if not modified:
+            return True
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Warning)
+        box.setWindowTitle("Unsaved changes")
+        if len(modified) == 1:
+            box.setText(
+                f"Save changes to \u201c{os.path.basename(modified[0].path)}\u201d?"
+            )
+        else:
+            box.setText(f"Save changes to {len(modified)} images?")
+        box.setInformativeText("Your changes will be lost if you don't save them.")
+        save_button = box.addButton(
+            "Save All" if len(modified) > 1 else "Save", QMessageBox.AcceptRole
+        )
+        discard_button = box.addButton("Discard", QMessageBox.DestructiveRole)
+        cancel_button = box.addButton("Cancel", QMessageBox.RejectRole)
+        box.setDefaultButton(save_button)
+        box.exec()
+        clicked = box.clickedButton()
+        if clicked is cancel_button:
+            return False
+        if clicked is discard_button:
+            return True
+        return self._save_all(modified)
+
+    def _save_all(self, docs) -> bool:
+        for doc in docs:
+            lossless = jpeg.is_lossless_for(doc.path, doc.ops) and jpeg.lossless_transform(
+                doc.path, doc.ops, doc.path
+            )
+            if not lossless and not fileops.save_image(doc.render(), doc.path):
+                QMessageBox.warning(self, "Save failed", f"Could not save {doc.path}")
+                return False
+            doc.commit()
+        self._refresh_current()
+        self._update_top()
+        self._update_status()
+        return True
+
     def open_file_dialog(self) -> None:
         start = self._folder or os.path.expanduser("~")
         path, _ = QFileDialog.getOpenFileName(self, "Open Image", start, IMAGE_FILTER)
@@ -252,6 +300,8 @@ class MainWindow(QMainWindow):
             self.open_folder(os.path.dirname(path), select=path)
 
     def open_folder(self, folder: str, select: str | None = None) -> None:
+        if not self._confirm_unsaved():
+            return
         self._folder = folder
         self._paths = list_images(folder)
         if not self._paths:
@@ -321,11 +371,14 @@ class MainWindow(QMainWindow):
             return
         doc = self._doc
         saved = False
-        if jpeg.is_lossless_for(doc.path, doc.ops):
+        jpeg_target = os.path.splitext(path)[1].lower() in jpeg.JPEG_EXTS
+        if jpeg_target and jpeg.is_lossless_for(doc.path, doc.ops):
             saved = jpeg.lossless_transform(doc.path, doc.ops, path)
         if not saved:
             saved = fileops.save_image(doc.render(), path)
         if saved:
+            doc.commit()
+            self._docs.pop(doc.path, None)
             self._docs.pop(path, None)
             self.open_path(path)
         else:

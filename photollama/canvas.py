@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import numpy as np
-from PySide6.QtCore import QPointF, QRectF, Qt, Signal
+from PySide6.QtCore import QPoint, QPointF, QRectF, Qt, Signal
 from PySide6.QtGui import (
     QColor,
     QColorSpace,
@@ -32,7 +32,7 @@ class Canvas(QGraphicsView):
         self.setRenderHints(QPainter.SmoothPixmapTransform | QPainter.Antialiasing)
         self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
         self.setResizeAnchor(QGraphicsView.AnchorViewCenter)
-        self.setDragMode(QGraphicsView.ScrollHandDrag)
+        self.setDragMode(QGraphicsView.NoDrag)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setAlignment(Qt.AlignCenter)
@@ -42,6 +42,8 @@ class Canvas(QGraphicsView):
         self._zoom = 1.0
         self._fit_mode = True
         self._hist: list | None = None
+        self._panning = False
+        self._pan_last = QPoint()
         self.show_thirds = False
         self.show_histogram = False
         self.apply_theme()
@@ -61,6 +63,7 @@ class Canvas(QGraphicsView):
             self._scene.setSceneRect(QRectF())
             self._hist = None
             self.viewport().update()
+            self._update_cursor()
             return
         self._image = image
         pixmap = QPixmap.fromImage(_to_srgb(image))
@@ -71,6 +74,7 @@ class Canvas(QGraphicsView):
             self.fit_to_window()
         else:
             self.viewport().update()
+        self._update_cursor()
 
     def wheelEvent(self, event):
         if self._image is None:
@@ -94,6 +98,7 @@ class Canvas(QGraphicsView):
         self._fit_mode = False
         self.centerOn(self._item)
         self.zoom_changed.emit(self._zoom)
+        self._update_cursor()
 
     def fit_to_window(self) -> None:
         if self._image is None:
@@ -110,6 +115,7 @@ class Canvas(QGraphicsView):
         self._fit_mode = True
         self.centerOn(self._item)
         self.zoom_changed.emit(self._zoom)
+        self._update_cursor()
 
     def _zoom_by(self, factor: float) -> None:
         target = max(MIN_ZOOM, min(self._zoom * factor, MAX_ZOOM))
@@ -120,11 +126,53 @@ class Canvas(QGraphicsView):
         self._zoom = target
         self._fit_mode = False
         self.zoom_changed.emit(self._zoom)
+        self._update_cursor()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
         if self._fit_mode:
             self.fit_to_window()
+        self._update_cursor()
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton and self._image is not None:
+            self._panning = True
+            self._pan_last = event.position().toPoint()
+            self.setCursor(Qt.ClosedHandCursor)
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self._panning:
+            pos = event.position().toPoint()
+            delta = pos - self._pan_last
+            self._pan_last = pos
+            hbar = self.horizontalScrollBar()
+            vbar = self.verticalScrollBar()
+            hbar.setValue(hbar.value() - delta.x())
+            vbar.setValue(vbar.value() - delta.y())
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if self._panning and event.button() == Qt.LeftButton:
+            self._panning = False
+            self._update_cursor()
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
+
+    def _update_cursor(self) -> None:
+        if self._image is None:
+            self.unsetCursor()
+            return
+        if (self.horizontalScrollBar().maximum() > 0
+                or self.verticalScrollBar().maximum() > 0):
+            self.setCursor(Qt.OpenHandCursor)
+        else:
+            self.setCursor(Qt.ArrowCursor)
 
     def paintEvent(self, event):
         super().paintEvent(event)
