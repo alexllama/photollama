@@ -107,6 +107,7 @@ class Theme(QObject):
         }}
         QStatusBar {{ background: {c['dark_background']}; color: {c['foreground']}; }}
         QStatusBar::item {{ border: none; }}
+        QStatusBar QLabel {{ background: transparent; color: {c['foreground']}; }}
         QMenuBar {{ background: {c['dark_background']}; color: {c['foreground']}; }}
         QMenuBar::item {{ padding: 4px 8px; background: transparent; }}
         QMenuBar::item:selected {{ background: {c['accent']}; color: {c['background']}; }}
@@ -116,4 +117,34 @@ class Theme(QObject):
         QMenu::item:selected {{ background: {c['accent']}; color: {c['background']}; }}
         QToolTip {{ background: {c['dark_background']}; color: {c['foreground']};
                     border: 1px solid {c['muted']}; }}
+        QToolBar#MainToolBar {{
+            background: {c['dark_background']};
+            border: none;
+            border-right: 1px solid {c['muted']};
+            spacing: 2px;
+            padding: 4px 3px;
+        }}
+        QToolBar#MainToolBar QToolButton {{
+            background: transparent;
+            border: none;
+            border-radius: 6px;
+            padding: 6px;
+        }}
+        QToolBar#MainToolBar QToolButton:hover {{
+            background: {c['lighter_background']};
+        }}
+        QToolBar#MainToolBar QToolButton:pressed {{
+            background: {c['accent']};
+        }}
+        QToolBar#MainToolBar QToolButton:checked {{
+            background: {c['accent']};
+        }}
+        QToolBar#MainToolBar QToolButton:disabled {{
+            background: transparent;
+        }}
+        QToolBar#MainToolBar::separator {{
+            background: {c['muted']};
+            height: 1px;
+            margin: 5px 4px;
+        }}
         """

@@ -4,9 +4,7 @@ A fast, keyboard-driven image viewer for Linux, built with PySide6 (Qt6) and
 designed to blend into an [Omarchy](https://omarchy.org) / Hyprland desktop by
 reading the active theme's colors at runtime.
 
-It started as a lightweight alternative to Gwenview with the workflow it was
-missing: quick browsing, non-destructive edits with undo, and lossless JPEG
-rotation.
+The inspiration for this app is Gwenview, but I wanted it to have the ability to rotate to any angle. Also I tend to have issues with right and left arrow sometimes skipping two images at one time. 
 
 ## Features
 
@@ -34,7 +32,7 @@ rotation.
 - `jpegtran` (from `libjpeg-turbo`) for lossless JPEG rotation — optional
 - `gio` for moving files to the trash
 
-On Arch/Omarchy:
+Install dependencies via Omarchy menus. If installing on Arch:
 
 ```sh
 sudo pacman -S pyside6 python-numpy libjpeg-turbo

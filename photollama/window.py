@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import os
 
-from PySide6.QtCore import QRect, Qt
-from PySide6.QtGui import QAction, QKeySequence
+from PySide6.QtCore import QRect, QSize, Qt
+from PySide6.QtGui import QAction, QIcon, QKeySequence
 from PySide6.QtWidgets import (
     QFileDialog,
     QInputDialog,
@@ -11,6 +11,8 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMenu,
     QMessageBox,
+    QStyle,
+    QToolBar,
     QVBoxLayout,
     QWidget,
 )
@@ -64,6 +66,7 @@ class MainWindow(QMainWindow):
         self.statusBar().addPermanentWidget(self.zoom_label)
 
         self._build_actions()
+        self._build_toolbar()
         self.canvas.zoom_changed.connect(self._update_status)
         self.theme.changed.connect(self._apply_theme)
         self._update_top()
@@ -226,6 +229,79 @@ class MainWindow(QMainWindow):
         view_menu.addAction(self.act_hist)
 
         self._update_actions()
+
+    def _build_toolbar(self) -> None:
+        self.toolbar = QToolBar("Edit & View", self)
+        self.toolbar.setObjectName("MainToolBar")
+        self.toolbar.setOrientation(Qt.Vertical)
+        self.toolbar.setMovable(False)
+        self.toolbar.setFloatable(False)
+        self.toolbar.setIconSize(QSize(20, 20))
+        self.toolbar.setToolButtonStyle(Qt.ToolButtonIconOnly)
+        self.addToolBar(Qt.LeftToolBarArea, self.toolbar)
+
+        edit_group = (
+            (self.act_undo, ("edit-undo",), QStyle.SP_ArrowBack),
+            (self.act_redo, ("edit-redo",), QStyle.SP_ArrowForward),
+            None,
+            (self.act_rotate_left, ("object-rotate-left",), QStyle.SP_ArrowLeft),
+            (self.act_rotate_right, ("object-rotate-right",), QStyle.SP_ArrowRight),
+            (self.act_rotate_angle, ("object-rotate-right", "view-refresh"), None),
+            None,
+            (self.act_flip_h, ("object-flip-horizontal",), None),
+            (self.act_flip_v, ("object-flip-vertical",), None),
+            None,
+            (self.act_crop, ("crop-symbolic", "crop", "object-crop"), None),
+            (self.act_levels, ("preferences-color-symbolic", "color-select-symbolic",
+                               "preferences-color"), None),
+        )
+        view_group = (
+            (self.act_next, ("go-next-symbolic", "go-next", "pan-end-symbolic"),
+             QStyle.SP_ArrowRight),
+            (self.act_prev, ("go-previous-symbolic", "go-previous", "pan-start-symbolic"),
+             QStyle.SP_ArrowLeft),
+            None,
+            (self.act_zoom_in, ("zoom-in",), None),
+            (self.act_zoom_out, ("zoom-out",), None),
+            (self.act_fit, ("zoom-fit-best",), QStyle.SP_TitleBarNormalButton),
+            (self.act_actual, ("zoom-original", "zoom-100"), None),
+            None,
+            (self.act_thirds, ("view-grid-symbolic", "view-app-grid-symbolic", "view-grid"),
+             None),
+            (self.act_hist, ("view-statistics-symbolic", "utilities-system-monitor-symbolic",
+                             "view-statistics"), None),
+        )
+
+        for entry in edit_group:
+            self._add_toolbar_entry(entry)
+        self.toolbar.addSeparator()
+        for entry in view_group:
+            self._add_toolbar_entry(entry)
+
+    def _add_toolbar_entry(self, entry) -> None:
+        if entry is None:
+            self.toolbar.addSeparator()
+            return
+        action, names, standard = entry
+        self._assign_icon(action, names, standard)
+        if not action.toolTip():
+            action.setToolTip(action.text())
+        shortcut = action.shortcut().toString()
+        if shortcut:
+            action.setToolTip(f"{action.text()}  ({shortcut})")
+        self.toolbar.addAction(action)
+
+    def _assign_icon(self, action: QAction, names, standard) -> None:
+        icon = QIcon()
+        for name in names:
+            candidate = QIcon.fromTheme(name)
+            if not candidate.isNull():
+                icon = candidate
+                break
+        if icon.isNull() and standard is not None:
+            icon = self.style().standardIcon(standard)
+        if not icon.isNull():
+            action.setIcon(icon)
 
     def _apply_theme(self) -> None:
         self.setPalette(self.theme.qpalette())
