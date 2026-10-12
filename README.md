@@ -8,7 +8,7 @@ The inspiration for this app is Gwenview, but I wanted it to have the ability to
 
 ## Screenshot
 
-![Photollama showing an image, the vertical Edit & View toolbar, and the status bar](piraguero.png)
+![Photollama showing an image, the vertical Edit & View toolbar, and the status bar](photollama.png)
 
 ## Features
 
