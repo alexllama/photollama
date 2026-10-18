@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 import numpy as np
 from PySide6.QtCore import QPoint, QPointF, QRectF, Qt, Signal
 from PySide6.QtGui import (
@@ -21,6 +23,8 @@ MAX_ZOOM = 40.0
 
 class Canvas(QGraphicsView):
     zoom_changed = Signal(float)
+    rotate_drag_started = Signal()
+    rotate_dragged = Signal(float)
 
     def __init__(self, theme: Theme, parent=None):
         super().__init__(parent)
@@ -44,7 +48,11 @@ class Canvas(QGraphicsView):
         self._hist: list | None = None
         self._panning = False
         self._pan_last = QPoint()
-        self.show_thirds = False
+        self.rotate_mode = False
+        self._rotate_dragging = False
+        self._rotate_center = QPointF()
+        self._rotate_start = 0.0
+        self.show_thirds = True
         self.show_histogram = False
         self.apply_theme()
 
@@ -135,6 +143,17 @@ class Canvas(QGraphicsView):
         self._update_cursor()
 
     def mousePressEvent(self, event):
+        if (self.rotate_mode and event.button() == Qt.LeftButton
+                and self._image is not None):
+            self._rotate_dragging = True
+            self._rotate_center = QPointF(
+                self.mapFromScene(self._item.sceneBoundingRect().center())
+            )
+            self._rotate_start = self._cursor_angle(event.position())
+            self.setCursor(Qt.ClosedHandCursor)
+            self.rotate_drag_started.emit()
+            event.accept()
+            return
         if event.button() == Qt.LeftButton and self._image is not None:
             self._panning = True
             self._pan_last = event.position().toPoint()
@@ -144,6 +163,11 @@ class Canvas(QGraphicsView):
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
+        if self._rotate_dragging:
+            delta = self._cursor_angle(event.position()) - self._rotate_start
+            self.rotate_dragged.emit(delta)
+            event.accept()
+            return
         if self._panning:
             pos = event.position().toPoint()
             delta = pos - self._pan_last
@@ -157,6 +181,11 @@ class Canvas(QGraphicsView):
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
+        if self._rotate_dragging and event.button() == Qt.LeftButton:
+            self._rotate_dragging = False
+            self._update_cursor()
+            event.accept()
+            return
         if self._panning and event.button() == Qt.LeftButton:
             self._panning = False
             self._update_cursor()
@@ -164,9 +193,16 @@ class Canvas(QGraphicsView):
             return
         super().mouseReleaseEvent(event)
 
+    def _cursor_angle(self, pos: QPointF) -> float:
+        offset = pos - self._rotate_center
+        return math.degrees(math.atan2(offset.y(), offset.x()))
+
     def _update_cursor(self) -> None:
         if self._image is None:
             self.unsetCursor()
+            return
+        if self.rotate_mode:
+            self.setCursor(Qt.OpenHandCursor)
             return
         if (self.horizontalScrollBar().maximum() > 0
                 or self.verticalScrollBar().maximum() > 0):

@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import os
 
-from PySide6.QtCore import QRect, QSize, Qt
+from PySide6.QtCore import QEvent, QRect, QSize, Qt
 from PySide6.QtGui import QAction, QIcon, QKeySequence
 from PySide6.QtWidgets import (
+    QApplication,
+    QDialog,
     QFileDialog,
     QInputDialog,
     QLabel,
@@ -25,7 +27,7 @@ from .dialogs.properties import PropertiesDialog
 from .dialogs.rotate_dialog import RotateDialog
 from .formats import load_image, list_images
 from .model import Document
-from .ops import Crop, Flip, Rotate90, RotateAngle
+from .ops import Crop, Flip, Rotate90
 from .theme import Theme
 
 IMAGE_FILTER = (
@@ -47,6 +49,7 @@ class MainWindow(QMainWindow):
         self._folder: str | None = None
         self._docs: dict[str, Document] = {}
         self._doc: Document | None = None
+        self._rotate_session: dict | None = None
 
         central = QWidget()
         layout = QVBoxLayout(central)
@@ -165,6 +168,7 @@ class MainWindow(QMainWindow):
         self.act_thirds.setCheckable(True)
         self.act_thirds.setShortcut("G")
         self.act_thirds.toggled.connect(self._toggle_thirds)
+        self.act_thirds.setChecked(True)
 
         self.act_hist = QAction("Histogram", self)
         self.act_hist.setCheckable(True)
@@ -536,12 +540,88 @@ class MainWindow(QMainWindow):
         self._apply_op(Flip(horizontal=horizontal))
 
     def rotate_angle_dialog(self) -> None:
-        if self._doc is None:
+        if self._doc is None or self._rotate_session is not None:
             return
-        preview = self._preview_image(self._doc.render())
-        dialog = RotateDialog(preview, self)
-        if dialog.exec():
-            self._apply_op(RotateAngle(dialog.spin.value(), dialog.autocrop.isChecked()))
+        base = self._doc.render()
+        preview = self._preview_image(base, max_dim=1200)
+
+        dialog = RotateDialog(self)
+
+        def update_preview(*_) -> None:
+            self.canvas.set_image(dialog.op().apply(preview), reset_view=True)
+
+        dialog.changed.connect(update_preview)
+        update_preview()
+
+        self._rotate_session = {
+            "dialog": dialog,
+            "base": base,
+            "update": update_preview,
+            "start": dialog.degrees(),
+        }
+        dialog.finished.connect(self._finish_rotate_session)
+        app = QApplication.instance()
+        if app is not None:
+            app.installEventFilter(self)
+        self.canvas.rotate_mode = True
+        self.canvas.rotate_drag_started.connect(self._rotate_drag_started)
+        self.canvas.rotate_dragged.connect(self._rotate_dragged)
+        self.canvas._update_cursor()
+        self._update_actions()
+        dialog.show()
+
+    def _rotate_drag_started(self) -> None:
+        session = self._rotate_session
+        if session is not None:
+            session["start"] = session["dialog"].degrees()
+
+    def _rotate_dragged(self, delta: float) -> None:
+        session = self._rotate_session
+        if session is not None:
+            session["dialog"].set_degrees(session["start"] + delta)
+
+    def _rotate_nudge(self, step: float) -> None:
+        session = self._rotate_session
+        if session is not None:
+            session["dialog"].set_degrees(session["dialog"].degrees() + step)
+
+    def _finish_rotate_session(self, result: int) -> None:
+        session = self._rotate_session
+        if session is None:
+            return
+        self._rotate_session = None
+        dialog = session["dialog"]
+        app = QApplication.instance()
+        if app is not None:
+            app.removeEventFilter(self)
+        for signal, slot in (
+            (dialog.changed, session["update"]),
+            (dialog.finished, self._finish_rotate_session),
+            (self.canvas.rotate_drag_started, self._rotate_drag_started),
+            (self.canvas.rotate_dragged, self._rotate_dragged),
+        ):
+            try:
+                signal.disconnect(slot)
+            except (RuntimeError, TypeError):
+                pass
+        self.canvas.rotate_mode = False
+        self.canvas._update_cursor()
+        if result == QDialog.Accepted:
+            self._apply_op(dialog.op())
+            self.canvas.fit_to_window()
+        else:
+            self.canvas.set_image(session["base"], reset_view=True)
+        self._update_actions()
+
+    def eventFilter(self, obj, event):
+        if (self._rotate_session is not None and event.type() == QEvent.KeyPress
+                and event.key() in (Qt.Key_Left, Qt.Key_Right)):
+            step = -1.0 if event.key() == Qt.Key_Left else 1.0
+            if event.modifiers() & Qt.ShiftModifier:
+                step *= 15.0
+            self._rotate_nudge(step)
+            return True
+        return super().eventFilter(obj, event)
 
     def crop_dialog(self) -> None:
         if self._doc is None:
@@ -656,6 +736,16 @@ class MainWindow(QMainWindow):
         self.act_next.setEnabled(self._index < len(self._paths) - 1)
         self.act_prev.setEnabled(self._index > 0)
         self.open_with_menu.setEnabled(has_doc)
+        if self._rotate_session is not None:
+            for action in (
+                self.act_open, self.act_open_folder, self.act_save, self.act_save_as,
+                self.act_rename, self.act_delete, self.act_properties, self.act_undo,
+                self.act_redo, self.act_rotate_left, self.act_rotate_right,
+                self.act_rotate_angle, self.act_flip_h, self.act_flip_v, self.act_crop,
+                self.act_levels, self.act_next, self.act_prev,
+            ):
+                action.setEnabled(False)
+            self.open_with_menu.setEnabled(False)
 
     def _toggle_thirds(self, checked: bool) -> None:
         self.canvas.show_thirds = checked

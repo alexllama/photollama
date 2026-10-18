@@ -18,7 +18,7 @@ The inspiration for this app is Gwenview, but I wanted it to have the ability to
   applies the palette to the UI and the image canvas, hot-reloading when you
   switch themes.
 - **Viewing** — zoom to cursor with the wheel, drag to pan, fit-to-window and
-  actual-size, a toggleable grid of thirds, and a toggleable RGB histogram.
+  actual-size, a grid of thirds (on by default), and a toggleable RGB histogram.
 - **Editing** — non-destructive: rotate 90°, rotate to any angle (with
   auto-crop), flip, crop with aspect-ratio presets, and levels. Every change is
   undoable.
@@ -99,6 +99,9 @@ python -m photollama ~/Pictures
 
 Mouse: the scroll wheel zooms toward the cursor, and dragging pans when zoomed
 in. In the crop dialog, drag the handles to resize and the interior to move.
+While the rotate dialog is open, drag the image in the main window to rotate it,
+and press `Left`/`Right` to nudge the angle by 1° (`Shift` for 15°). The grid of
+thirds stays fixed, so it can be used to judge when things are level.
 
 ## How it works
 
