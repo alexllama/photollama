@@ -25,15 +25,21 @@ from .dialogs.crop_dialog import CropDialog
 from .dialogs.levels_dialog import LevelsDialog
 from .dialogs.properties import PropertiesDialog
 from .dialogs.rotate_dialog import RotateDialog
-from .formats import load_image, list_images
+from .formats import SUPPORTED_EXTS, load_image, list_images
 from .model import Document
 from .ops import Crop, Flip, Rotate90
 from .theme import Theme
 
-IMAGE_FILTER = (
-    "Images (*.jpg *.jpeg *.png *.gif *.webp *.tif *.tiff *.bmp *.ico *.svg "
-    "*.jp2 *.ppm *.pgm *.pbm *.xbm *.xpm);;All files (*)"
-)
+def _build_image_filter() -> str:
+    # File-name filters are case-sensitive on Linux, so list both cases.
+    patterns: list[str] = []
+    for ext in sorted(SUPPORTED_EXTS):
+        patterns.append(f"*{ext}")
+        patterns.append(f"*{ext.upper()}")
+    return f"Images ({' '.join(patterns)});;All files (*)"
+
+
+IMAGE_FILTER = _build_image_filter()
 
 
 class MainWindow(QMainWindow):
