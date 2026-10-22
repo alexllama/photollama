@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (
 
 from . import exif, fileops, jpeg
 from .canvas import Canvas
-from .dialogs.crop_dialog import CropDialog
+from .dialogs.crop_dialog import CropDialog, load_crop_state, save_crop_state
 from .dialogs.levels_dialog import LevelsDialog
 from .dialogs.properties import PropertiesDialog
 from .dialogs.rotate_dialog import RotateDialog
@@ -115,7 +115,7 @@ class MainWindow(QMainWindow):
         self.act_undo.triggered.connect(self.undo)
 
         self.act_redo = QAction("Redo", self)
-        self.act_redo.setShortcut(QKeySequence.Redo)
+        self.act_redo.setShortcuts([QKeySequence("Ctrl+Y"), QKeySequence.Redo])
         self.act_redo.triggered.connect(self.redo)
 
         self.act_rotate_left = QAction("Rotate Left", self)
@@ -622,9 +622,9 @@ class MainWindow(QMainWindow):
     def eventFilter(self, obj, event):
         if (self._rotate_session is not None and event.type() == QEvent.KeyPress
                 and event.key() in (Qt.Key_Left, Qt.Key_Right)):
-            step = -1.0 if event.key() == Qt.Key_Left else 1.0
+            step = -0.1 if event.key() == Qt.Key_Left else 0.1
             if event.modifiers() & Qt.ShiftModifier:
-                step *= 15.0
+                step *= 150.0
             self._rotate_nudge(step)
             return True
         return super().eventFilter(obj, event)
@@ -634,7 +634,17 @@ class MainWindow(QMainWindow):
             return
         rendered = self._doc.render()
         preview = self._preview_image(rendered, max_dim=1400)
-        dialog = CropDialog(preview, self)
+
+        label, saved_size = load_crop_state()
+        start_size = None
+        if saved_size is not None and rendered.width() > 0:
+            scale = preview.width() / rendered.width()
+            start_size = QSize(
+                max(1, round(saved_size.width() * scale)),
+                max(1, round(saved_size.height() * scale)),
+            )
+
+        dialog = CropDialog(preview, self, aspect_label=label, crop_size=start_size)
         if not dialog.exec():
             return
         rect = dialog.crop_rect()
@@ -644,6 +654,7 @@ class MainWindow(QMainWindow):
                 round(rect.x() * scale), round(rect.y() * scale),
                 round(rect.width() * scale), round(rect.height() * scale),
             )
+        save_crop_state(dialog.aspect_label(), QSize(rect.width(), rect.height()))
         self._apply_op(Crop(rect))
 
     def levels_dialog(self) -> None:

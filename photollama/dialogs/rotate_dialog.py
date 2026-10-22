@@ -5,19 +5,21 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
     QDialogButtonBox,
+    QDoubleSpinBox,
     QFormLayout,
     QHBoxLayout,
     QLabel,
     QSlider,
-    QSpinBox,
     QVBoxLayout,
 )
 
 from ..ops import RotateAngle
 
+SLIDER_SCALE = 10  # slider works in tenths of a degree
 
-def _normalize_degrees(value: float) -> int:
-    return int(round((value + 180.0) % 360.0 - 180.0))
+
+def _normalize_degrees(value: float) -> float:
+    return round((value + 180.0) % 360.0 - 180.0, 1)
 
 
 class RotateDialog(QDialog):
@@ -29,14 +31,17 @@ class RotateDialog(QDialog):
         self.setMinimumWidth(420)
 
         self.slider = QSlider(Qt.Horizontal)
-        self.slider.setRange(-180, 180)
-        self.slider.setValue(int(round(degrees)))
-        self.spin = QSpinBox()
-        self.spin.setRange(-180, 180)
+        self.slider.setRange(-180 * SLIDER_SCALE, 180 * SLIDER_SCALE)
+        self.slider.setPageStep(SLIDER_SCALE)
+        self.slider.setValue(int(round(degrees * SLIDER_SCALE)))
+        self.spin = QDoubleSpinBox()
+        self.spin.setDecimals(1)
+        self.spin.setSingleStep(0.1)
+        self.spin.setRange(-180.0, 180.0)
         self.spin.setSuffix("°")
-        self.spin.setValue(int(round(degrees)))
-        self.slider.valueChanged.connect(self.spin.setValue)
-        self.spin.valueChanged.connect(self.slider.setValue)
+        self.spin.setValue(round(degrees, 1))
+        self.slider.valueChanged.connect(self._slider_moved)
+        self.spin.valueChanged.connect(self._spin_changed)
         self.spin.valueChanged.connect(self._emit_changed)
 
         self.autocrop = QCheckBox("Auto-crop to fit")
@@ -62,6 +67,12 @@ class RotateDialog(QDialog):
         layout.addLayout(form)
         layout.addWidget(hint)
         layout.addWidget(buttons)
+
+    def _slider_moved(self, value: int) -> None:
+        self.spin.setValue(value / SLIDER_SCALE)
+
+    def _spin_changed(self, value: float) -> None:
+        self.slider.setValue(int(round(value * SLIDER_SCALE)))
 
     def _emit_changed(self, *_) -> None:
         self.changed.emit()

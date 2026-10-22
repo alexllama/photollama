@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 import numpy as np
 from PySide6.QtGui import QImage
 
@@ -12,7 +14,9 @@ def to_rgb_array(image: QImage) -> np.ndarray:
     raw = np.frombuffer(converted.constBits(), np.uint8)
     raw = raw[: converted.sizeInBytes()]
     rows = raw.reshape((height, converted.bytesPerLine()))[:, : width * 3]
-    return np.ascontiguousarray(rows.reshape((height, width, 3)))
+    # copy() is essential: without it this is a view into the QImage buffer,
+    # which is freed when ``converted`` goes out of scope (dangling pointer).
+    return rows.reshape((height, width, 3)).copy()
 
 
 def array_to_image(array: np.ndarray) -> QImage:
@@ -59,4 +63,32 @@ def build_levels_lut(in_black, in_white, gamma, out_black, out_white) -> np.ndar
     shaped = np.power(normalized, 1.0 / gamma[:, None])
     output = out_black[:, None] + shaped * (out_white - out_black)[:, None]
     return np.clip(output, 0, 255).round().astype(np.uint8)
+
+
+def levels_lut(in_black, in_white, gamma, out_black, out_white,
+               channel: int | None = None) -> np.ndarray:
+    """Levels LUT as a (3, 256) array.
+
+    ``channel`` of ``None`` adjusts all channels (GIMP's "Value"); 0/1/2 targets
+    only that colour channel and leaves the others untouched.
+    """
+    adjusted = build_levels_lut(in_black, in_white, gamma, out_black, out_white)
+    if channel is None:
+        return adjusted
+    lut = np.tile(np.arange(256, dtype=np.uint8), (3, 1))
+    lut[channel] = adjusted[channel]
+    return lut
+
+
+def gamma_to_handle(in_black: float, in_white: float, gamma: float) -> float:
+    """Input value where the gamma (grey) point sits, for the given gamma."""
+    span = max(in_white - in_black, 1.0)
+    return in_black + (0.5 ** gamma) * span
+
+
+def handle_to_gamma(in_black: float, in_white: float, value: float) -> float:
+    """Gamma implied by the grey point sitting at ``value``."""
+    span = max(in_white - in_black, 1.0)
+    t = min(max((value - in_black) / span, 0.001), 0.999)
+    return math.log(t) / math.log(0.5)
 

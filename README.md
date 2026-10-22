@@ -20,8 +20,9 @@ The inspiration for this app is Gwenview, but I wanted it to have the ability to
 - **Viewing** — zoom to cursor with the wheel, drag to pan, fit-to-window and
   actual-size, a grid of thirds (on by default), and a toggleable RGB histogram.
 - **Editing** — non-destructive: rotate 90°, rotate to any angle (with
-  auto-crop), flip, crop with aspect-ratio presets, and levels. Every change is
-  undoable.
+  auto-crop), flip, crop with aspect-ratio presets, and a GIMP-style levels
+  tool (input/output black, gamma and white points, per channel, with a live
+  preview). Every change is undoable.
 - **Lossless JPEG** — saves that only rotate/flip a JPEG are written with
   `jpegtran`, so no re-encoding.
 - **File operations** — save, save as, move to trash, rename, open with, and a
@@ -81,7 +82,7 @@ python -m photollama ~/Pictures
 | --- | --- |
 | Open file / folder | `Ctrl+O` / `Ctrl+Shift+O` |
 | Save / Save as | `Ctrl+S` / `Ctrl+Shift+S` |
-| Undo / Redo | `Ctrl+Z` / `Ctrl+Shift+Z` |
+| Undo / Redo | `Ctrl+Z` / `Ctrl+Y` (also `Ctrl+Shift+Z`) |
 | Next / Previous image | `Right` / `Left` (also `Space` / `Backspace`) |
 | Zoom in / out | `Ctrl+=` / `Ctrl+-` |
 | Fit to window / Actual size | `Ctrl+0` / `Ctrl+1` |
@@ -100,8 +101,9 @@ python -m photollama ~/Pictures
 Mouse: the scroll wheel zooms toward the cursor, and dragging pans when zoomed
 in. In the crop dialog, drag the handles to resize and the interior to move.
 While the rotate dialog is open, drag the image in the main window to rotate it,
-and press `Left`/`Right` to nudge the angle by 1° (`Shift` for 15°). The grid of
-thirds stays fixed, so it can be used to judge when things are level.
+and press `Left`/`Right` to nudge the angle by 0.1° (`Shift` for 15°). The angle
+field accepts 0.1° precision. The grid of thirds stays fixed, so it can be used
+to judge when things are level.
 
 ## How it works
 

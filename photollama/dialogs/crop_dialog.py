@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QPoint, QPointF, QRect, QRectF, Qt
+from PySide6.QtCore import QPoint, QPointF, QRect, QRectF, QSettings, QSize, Qt
 from PySide6.QtGui import QBrush, QColor, QPainter, QPainterPath, QPen, QPixmap
 from PySide6.QtWidgets import (
     QComboBox,
@@ -20,14 +20,43 @@ ASPECTS = [
     ("Original", "original"),
     ("1:1", 1.0),
     ("4:3", 4 / 3),
+    ("3:4", 3 / 4),
     ("3:2", 3 / 2),
+    ("2:3", 2 / 3),
     ("16:9", 16 / 9),
     ("9:16", 9 / 16),
 ]
 
+_SETTINGS_ORG = "photollama"
+_SETTINGS_APP = "photollama"
+
+
+def load_crop_state() -> tuple[str | None, QSize | None]:
+    """Last used aspect label and crop size (in source pixels), if any."""
+    settings = QSettings(_SETTINGS_ORG, _SETTINGS_APP)
+    label = settings.value("crop/aspect")
+    width = settings.value("crop/width")
+    height = settings.value("crop/height")
+    size = None
+    try:
+        if width is not None and height is not None:
+            w, h = int(width), int(height)
+            if w > 0 and h > 0:
+                size = QSize(w, h)
+    except (TypeError, ValueError):
+        size = None
+    return (str(label) if label else None, size)
+
+
+def save_crop_state(label: str, size: QSize) -> None:
+    settings = QSettings(_SETTINGS_ORG, _SETTINGS_APP)
+    settings.setValue("crop/aspect", label)
+    settings.setValue("crop/width", size.width())
+    settings.setValue("crop/height", size.height())
+
 
 class CropView(QGraphicsView):
-    def __init__(self, image, parent=None):
+    def __init__(self, image, parent=None, crop_size: QSize | None = None):
         super().__init__(parent)
         self._scene = QGraphicsScene(self)
         self._item = QGraphicsPixmapItem(QPixmap.fromImage(image))
@@ -41,7 +70,12 @@ class CropView(QGraphicsView):
 
         self._w = image.width()
         self._h = image.height()
-        self._crop = QRectF(self._w * 0.05, self._h * 0.05, self._w * 0.9, self._h * 0.9)
+        if crop_size is not None and crop_size.width() > 0 and crop_size.height() > 0:
+            w = min(crop_size.width(), self._w)
+            h = min(crop_size.height(), self._h)
+            self._crop = QRectF((self._w - w) / 2, (self._h - h) / 2, w, h)
+        else:
+            self._crop = QRectF(self._w * 0.05, self._h * 0.05, self._w * 0.9, self._h * 0.9)
         self._aspect: float | None = None
         self._mode: str | None = None
         self._start = QPoint()
@@ -283,17 +317,25 @@ class CropView(QGraphicsView):
 
 
 class CropDialog(QDialog):
-    def __init__(self, image, parent=None):
+    def __init__(self, image, parent=None, aspect_label: str | None = None,
+                 crop_size: QSize | None = None):
         super().__init__(parent)
         self.setWindowTitle("Crop")
         self.setMinimumSize(720, 560)
 
-        self.view = CropView(image)
+        self.view = CropView(image, crop_size=crop_size)
 
         self.aspect = QComboBox()
-        for label, value in ASPECTS:
+        default_index = 0
+        wanted_index = None
+        for i, (label, value) in enumerate(ASPECTS):
             self.aspect.addItem(label, value)
+            if label == "Original":
+                default_index = i
+            if aspect_label and label == aspect_label:
+                wanted_index = i
         self.aspect.currentIndexChanged.connect(self._aspect_changed)
+        self.aspect.setCurrentIndex(wanted_index if wanted_index is not None else default_index)
 
         ratio_row = QHBoxLayout()
         ratio_row.addWidget(QLabel("Aspect ratio:"))
@@ -314,3 +356,6 @@ class CropDialog(QDialog):
 
     def crop_rect(self) -> QRect:
         return self.view.crop_rect()
+
+    def aspect_label(self) -> str:
+        return self.aspect.currentText()
