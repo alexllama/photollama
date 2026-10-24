@@ -4,6 +4,7 @@ import os
 
 from PySide6.QtCore import QEvent, QRect, QSize, Qt
 from PySide6.QtGui import QAction, QIcon, QKeySequence
+from PySide6.QtNetwork import QNetworkAccessManager
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
@@ -20,7 +21,12 @@ from PySide6.QtWidgets import (
 )
 
 from . import exif, fileops, jpeg
+from .ai import AIProviderError
+from .ai import gemini as gemini_client
+from .ai import openrouter as openrouter_client
+from .ai import pollinations as pollinations_client
 from .canvas import Canvas
+from .dialogs.ai_enhance import AIEnhanceDialog
 from .dialogs.crop_dialog import CropDialog, load_crop_state, save_crop_state
 from .dialogs.levels_dialog import LevelsDialog
 from .dialogs.properties import PropertiesDialog
@@ -56,6 +62,12 @@ class MainWindow(QMainWindow):
         self._docs: dict[str, Document] = {}
         self._doc: Document | None = None
         self._rotate_session: dict | None = None
+        self._ai_manager = QNetworkAccessManager(self)
+        self._ai_or = openrouter_client.OpenRouterClient(self._ai_manager)
+        self._ai_gem = gemini_client.GeminiClient(self._ai_manager)
+        self._ai_poll = pollinations_client.PollinationsClient(self._ai_manager)
+        self._ai_reply = None
+        self._ai_dialog = None
 
         central = QWidget()
         layout = QVBoxLayout(central)
@@ -146,6 +158,9 @@ class MainWindow(QMainWindow):
         self.act_levels.setShortcut("Ctrl+Shift+L")
         self.act_levels.triggered.connect(self.levels_dialog)
 
+        self.act_ai_enhance = QAction("AI Enhance…", self)
+        self.act_ai_enhance.triggered.connect(self.ai_enhance_dialog)
+
         self.act_next = QAction("Next Image", self)
         self.act_next.setShortcuts([QKeySequence("Right"), QKeySequence("Space")])
         self.act_next.triggered.connect(self.next_image)
@@ -190,9 +205,9 @@ class MainWindow(QMainWindow):
             self.act_rename, self.act_delete, self.act_properties, self.act_undo,
             self.act_redo, self.act_rotate_left, self.act_rotate_right,
             self.act_rotate_angle, self.act_flip_h, self.act_flip_v, self.act_crop,
-            self.act_levels, self.act_next, self.act_prev, self.act_zoom_in,
-            self.act_zoom_out, self.act_fit, self.act_actual, self.act_thirds,
-            self.act_hist, self.act_quit,
+            self.act_levels, self.act_ai_enhance, self.act_next, self.act_prev,
+            self.act_zoom_in, self.act_zoom_out, self.act_fit, self.act_actual,
+            self.act_thirds, self.act_hist, self.act_quit,
         ):
             self.addAction(action)
 
@@ -225,6 +240,8 @@ class MainWindow(QMainWindow):
         edit_menu.addSeparator()
         edit_menu.addAction(self.act_crop)
         edit_menu.addAction(self.act_levels)
+        edit_menu.addSeparator()
+        edit_menu.addAction(self.act_ai_enhance)
 
         view_menu = self.menuBar().addMenu("&View")
         view_menu.addAction(self.act_next)
@@ -264,6 +281,8 @@ class MainWindow(QMainWindow):
             (self.act_crop, ("crop-symbolic", "crop", "object-crop"), None),
             (self.act_levels, ("preferences-color-symbolic", "color-select-symbolic",
                                "preferences-color"), None),
+            (self.act_ai_enhance, ("starred-symbolic", "starred", "emblem-favorite-symbolic",
+                                   "emblem-favorite", "applications-graphics"), None),
         )
         view_group = (
             (self.act_next, ("go-next-symbolic", "go-next", "pan-end-symbolic"),
@@ -748,6 +767,7 @@ class MainWindow(QMainWindow):
         for action in (
             self.act_rotate_left, self.act_rotate_right, self.act_rotate_angle,
             self.act_flip_h, self.act_flip_v, self.act_crop, self.act_levels,
+            self.act_ai_enhance,
         ):
             action.setEnabled(has_doc)
         self.act_next.setEnabled(self._index < len(self._paths) - 1)
@@ -771,3 +791,103 @@ class MainWindow(QMainWindow):
     def _toggle_histogram(self, checked: bool) -> None:
         self.canvas.show_histogram = checked
         self.canvas.viewport().update()
+
+
+    def ai_enhance_dialog(self) -> None:
+        if self._doc is None:
+            return
+        image = self._doc.render()
+        from PySide6.QtGui import QPixmap
+        pix = QPixmap.fromImage(image.scaled(500, 200, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        dialog = AIEnhanceDialog(self, preview_pixmap=pix)
+        if dialog.exec() != QDialog.Accepted:
+            return
+        prompt = dialog.prompt_text()
+        if not prompt:
+            QMessageBox.warning(self, "AI Enhance", "Please enter a prompt.")
+            return
+        dialog.save_config()
+        provider = dialog.provider_id()
+        model = dialog.model_id()
+        key = dialog.key_for_provider()
+        if provider in ("openrouter", "gemini") and not key:
+            QMessageBox.warning(self, "AI Enhance", "Please enter an API key for the selected provider.")
+            return
+        self.statusBar().showMessage(f"Enhancing with {provider}/{model}...")
+        self._ai_dialog = dialog
+        try:
+            if provider == "openrouter":
+                self._ai_or.enhance(image, prompt, key, model)
+            elif provider == "gemini":
+                self._ai_gem.enhance(image, prompt, key, model)
+            elif provider == "pollinations":
+                self._ai_poll.enhance(image, prompt, "", model)
+            else:
+                QMessageBox.warning(self, "AI Enhance", "Unknown provider")
+                self.statusBar().clearMessage()
+                return
+        except AIProviderError as exc:
+            QMessageBox.critical(self, "AI Enhance", str(exc))
+            self.statusBar().clearMessage()
+            return
+        if provider == "openrouter":
+            reply = self._ai_or._reply
+        elif provider == "gemini":
+            reply = self._ai_gem._reply
+        elif provider == "pollinations":
+            reply = self._ai_poll._reply
+        else:
+            reply = None
+        if reply is None:
+            QMessageBox.critical(self, "AI Enhance", "Failed to start request")
+            self.statusBar().clearMessage()
+            return
+        self._ai_reply = reply
+        reply.finished.connect(self._on_ai_finished)
+        self._update_actions()
+
+    def _on_ai_finished(self) -> None:
+        reply = self._ai_reply
+        self._ai_reply = None
+        if reply is None:
+            self.statusBar().clearMessage()
+            self._update_actions()
+            return
+        try:
+            provider = self._ai_dialog.provider_id() if self._ai_dialog else "openrouter"
+            if provider == "gemini":
+                result = gemini_client.parse_response(reply)
+            elif provider == "pollinations":
+                result = pollinations_client.parse_response(reply)
+            else:
+                result = openrouter_client.parse_response(reply)
+        except AIProviderError as exc:
+            QMessageBox.critical(self, "AI Enhance", str(exc))
+            self.statusBar().clearMessage()
+            self._update_actions()
+            try:
+                reply.deleteLater()
+            except Exception:
+                pass
+            return
+        except Exception as exc:
+            QMessageBox.critical(self, "AI Enhance", f"Unexpected error: {exc}")
+            self.statusBar().clearMessage()
+            self._update_actions()
+            try:
+                reply.deleteLater()
+            except Exception:
+                pass
+            return
+        try:
+            reply.deleteLater()
+        except Exception:
+            pass
+        import tempfile
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+        tmp.write(result.raw_bytes)
+        tmp.close()
+        self.statusBar().showMessage("Opening enhanced image...")
+        self.open_path(tmp.name)
+        self.statusBar().clearMessage()
+        self._update_actions()
