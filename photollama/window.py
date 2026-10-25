@@ -757,6 +757,8 @@ class MainWindow(QMainWindow):
     def _update_actions(self) -> None:
         has_doc = self._doc is not None
         modified = has_doc and self._doc.is_modified
+        self.act_open.setEnabled(True)
+        self.act_open_folder.setEnabled(True)
         self.act_save.setEnabled(modified)
         self.act_save_as.setEnabled(has_doc)
         self.act_rename.setEnabled(has_doc and not modified)
