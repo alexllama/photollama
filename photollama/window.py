@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 
 from PySide6.QtCore import QEvent, QRect, QSize, Qt
 from PySide6.QtGui import QAction, QIcon, QKeySequence
@@ -68,6 +69,7 @@ class MainWindow(QMainWindow):
         self._ai_poll = pollinations_client.PollinationsClient(self._ai_manager)
         self._ai_reply = None
         self._ai_dialog = None
+        self._ai_source_path: str | None = None
 
         central = QWidget()
         layout = QVBoxLayout(central)
@@ -817,6 +819,7 @@ class MainWindow(QMainWindow):
             return
         self.statusBar().showMessage(f"Enhancing with {provider}/{model}...")
         self._ai_dialog = dialog
+        self._ai_source_path = self._doc.path
         try:
             if provider == "openrouter":
                 self._ai_or.enhance(image, prompt, key, model)
@@ -847,6 +850,21 @@ class MainWindow(QMainWindow):
         self._ai_reply = reply
         reply.finished.connect(self._on_ai_finished)
         self._update_actions()
+
+    def _ai_output_path(self, source: str, ext: str | None = None) -> str:
+        folder = os.path.dirname(source)
+        stem, source_ext = os.path.splitext(os.path.basename(source))
+        if ext is None:
+            ext = source_ext.lower()
+            if ext not in fileops.EXT_FORMAT:
+                ext = ".png"
+        base = re.sub(r"-ai(?:-\d+)?$", "", stem) or stem
+        candidate = os.path.join(folder, f"{base}-ai{ext}")
+        counter = 2
+        while os.path.exists(candidate):
+            candidate = os.path.join(folder, f"{base}-ai-{counter}{ext}")
+            counter += 1
+        return candidate
 
     def _on_ai_finished(self) -> None:
         reply = self._ai_reply
@@ -885,11 +903,20 @@ class MainWindow(QMainWindow):
             reply.deleteLater()
         except Exception:
             pass
-        import tempfile
-        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-        tmp.write(result.raw_bytes)
-        tmp.close()
-        self.statusBar().showMessage("Opening enhanced image...")
-        self.open_path(tmp.name)
-        self.statusBar().clearMessage()
+        source = self._ai_source_path or (self._doc.path if self._doc else "")
+        out_path = self._ai_output_path(source) if source else ""
+        saved = bool(out_path) and fileops.save_image(result.image, out_path)
+        if not saved and source:
+            out_path = self._ai_output_path(source, ".png")
+            saved = fileops.save_image(result.image, out_path)
+        if not saved:
+            QMessageBox.critical(
+                self, "AI Enhance",
+                "Could not save the enhanced image next to the original.",
+            )
+            self.statusBar().clearMessage()
+            self._update_actions()
+            return
+        self.statusBar().showMessage(f"Saved {os.path.basename(out_path)}", 5000)
+        self.open_path(out_path)
         self._update_actions()
