@@ -4,7 +4,15 @@ import os
 import re
 
 from PySide6.QtCore import QEvent, QRect, QSize, Qt
-from PySide6.QtGui import QAction, QIcon, QKeySequence
+from PySide6.QtGui import (
+    QAction,
+    QColor,
+    QIcon,
+    QKeySequence,
+    QPainter,
+    QPainterPath,
+    QPixmap,
+)
 from PySide6.QtNetwork import QNetworkAccessManager
 from PySide6.QtWidgets import (
     QApplication,
@@ -161,6 +169,7 @@ class MainWindow(QMainWindow):
         self.act_levels.triggered.connect(self.levels_dialog)
 
         self.act_ai_enhance = QAction("AI Enhance…", self)
+        self.act_ai_enhance.setShortcut("Ctrl+Shift+A")
         self.act_ai_enhance.triggered.connect(self.ai_enhance_dialog)
 
         self.act_next = QAction("Next Image", self)
@@ -283,8 +292,7 @@ class MainWindow(QMainWindow):
             (self.act_crop, ("crop-symbolic", "crop", "object-crop"), None),
             (self.act_levels, ("preferences-color-symbolic", "color-select-symbolic",
                                "preferences-color"), None),
-            (self.act_ai_enhance, ("starred-symbolic", "starred", "emblem-favorite-symbolic",
-                                   "emblem-favorite", "applications-graphics"), None),
+            (self.act_ai_enhance, (), None),
         )
         view_group = (
             (self.act_next, ("go-next-symbolic", "go-next", "pan-end-symbolic"),
@@ -323,6 +331,9 @@ class MainWindow(QMainWindow):
         self.toolbar.addAction(action)
 
     def _assign_icon(self, action: QAction, names, standard) -> None:
+        if action is self.act_ai_enhance:
+            action.setIcon(self._sparkle_icon())
+            return
         icon = QIcon()
         for name in names:
             candidate = QIcon.fromTheme(name)
@@ -333,6 +344,39 @@ class MainWindow(QMainWindow):
             icon = self.style().standardIcon(standard)
         if not icon.isNull():
             action.setIcon(icon)
+
+    def _sparkle_icon(self, size: int = 20) -> QIcon:
+        scale = 4
+        pixmap = QPixmap(size * scale, size * scale)
+        pixmap.fill(Qt.transparent)
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.scale(scale, scale)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QColor("#FFC83D"))
+        for cx, cy, radius in (
+            (8.1, 10.9, 7.6),
+            (16.2, 5.0, 3.4),
+            (15.4, 15.2, 2.1),
+        ):
+            painter.drawPath(self._sparkle_path(cx, cy, radius))
+        painter.end()
+        icon = QIcon()
+        for mode in (QIcon.Normal, QIcon.Disabled, QIcon.Active, QIcon.Selected):
+            icon.addPixmap(pixmap, mode, QIcon.Off)
+        return icon
+
+    @staticmethod
+    def _sparkle_path(cx: float, cy: float, radius: float) -> QPainterPath:
+        k = radius * 0.16
+        path = QPainterPath()
+        path.moveTo(cx, cy - radius)
+        path.quadTo(cx + k, cy - k, cx + radius, cy)
+        path.quadTo(cx + k, cy + k, cx, cy + radius)
+        path.quadTo(cx - k, cy + k, cx - radius, cy)
+        path.quadTo(cx - k, cy - k, cx, cy - radius)
+        path.closeSubpath()
+        return path
 
     def _apply_theme(self) -> None:
         self.setPalette(self.theme.qpalette())

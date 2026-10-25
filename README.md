@@ -91,6 +91,7 @@ python -m photollama ~/Pictures
 | Flip horizontal / vertical | `Ctrl+Shift+H` / `Ctrl+Shift+V` |
 | Crop | `Ctrl+Shift+C` |
 | Levels | `Ctrl+Shift+L` |
+| AI Enhance | `Ctrl+Shift+A` |
 | Grid of thirds | `G` |
 | Histogram | `H` |
 | Rename | `F2` |
