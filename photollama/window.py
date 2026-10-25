@@ -858,11 +858,11 @@ class MainWindow(QMainWindow):
             ext = source_ext.lower()
             if ext not in fileops.EXT_FORMAT:
                 ext = ".png"
-        base = re.sub(r"-ai(?:-\d+)?$", "", stem) or stem
+        base = re.sub(r"-ai-?\d*$", "", stem) or stem
         candidate = os.path.join(folder, f"{base}-ai{ext}")
-        counter = 2
+        counter = 1
         while os.path.exists(candidate):
-            candidate = os.path.join(folder, f"{base}-ai-{counter}{ext}")
+            candidate = os.path.join(folder, f"{base}-ai{counter}{ext}")
             counter += 1
         return candidate
 

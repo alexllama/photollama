@@ -58,7 +58,13 @@ class AIConfig:
 
     @property
     def gemini_model(self) -> str:
-        return _get(GROUP, "gemini_model", "gemini-2.5-flash-image")
+        value = _get(GROUP, "gemini_model", "gemini-nano-banana-2.1")
+        if value in {
+            "gemini-2.0-flash-preview-image-generation",
+            "gemini-2.0-flash-exp-image-generation",
+        }:
+            return "gemini-nano-banana-2.1"
+        return value
 
     @gemini_model.setter
     def gemini_model(self, value: str) -> None:

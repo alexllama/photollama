@@ -21,15 +21,30 @@ from PySide6.QtWidgets import (
 
 from ..ai.config import config
 
-
 PRESETS = [
-    ("Gentle Enhance (Recommended)", "Enhance the colors and remove noise. Make no other changes to the content, composition, text, or people. Preserve fine details and natural lighting."),
-    ("Photo Cleanup", "Subtly clean up this photo. Reduce sensor noise, correct mild color cast, improve micro-contrast. Keep it photorealistic. Do not add, remove, or redraw objects."),
-    ("Upscale & Refine", "Upscale and refine this image with minimal hallucinations. Restore natural textures and sharpen only where needed. Do not change facial features, text, or layout."),
-    ("Old Photo Restoration", "Gently restore an old photograph. Reduce dust and grain, fix faded colors while keeping period-accurate tones. Do not modernize clothing, faces, or backgrounds."),
-    ("Sharpen Details", "Apply very light detail enhancement for improved clarity. Avoid oversharpening, halos, or AI smoothing. Keep the original look as much as possible."),
+    (
+        "Gentle Enhance (Recommended)",
+        "Perform light color balancing and noise reduction on this image while strictly retaining 100% of the original content, composition, and details. Preserve exact facial features, existing text, line art, and natural lighting. Do not invent new elements, sharpen excessively, or apply AI-smoothing effects."
+    ),
+    (
+        "Photo Cleanup",
+        "Subtly clean up noise and compression artifacts from this photo. Correct mild color casts and improve micro-contrast while maintaining strict photorealism. Maintain original facial proportions, body features, background details, and text. Absolutely zero redrawing, addition, or deletion of subjects or scene elements."
+    ),
+    (
+        "Upscale & Refine",
+        "Upscale and refine image details with zero hallucinations or alterations to the core content. Restore natural skin textures, hair, fabrics, and fine edges. Strictly preserve the original layout, text glyphs, geometry, and facial identity without warping or smoothing."
+    ),
+    (
+        "Old Photo Restoration",
+        "Restoration of an archival photograph. Carefully remove dust spots, scratches, and film grain while repairing faded color saturation and tone. Keep period-accurate photographic characteristics, grain texture, and historical color profiles. Do not modernize faces, clothing, hair, or backgrounds, and avoid plastic skin effects."
+    ),
+    (
+        "Sharpen Details",
+        "Apply targeted micro-contrast and light detail sharpening for subtle edge clarity. Avoid halo artifacts, over-sharpening, ringing, or digital smoothing. Retain exact color values, grain structure, lighting, composition, and subject details as in the input image."
+    ),
     ("Custom", ""),
 ]
+
 
 POLLINATIONS_MODELS = [
     "flux",
@@ -44,8 +59,10 @@ OPENROUTER_MODELS = [
 ]
 
 GEMINI_MODELS = [
+    "gemini-nano-banana-2.1",
+    "gemini-3.1-flash-image",
+    "gemini-3-pro-image",
     "gemini-2.5-flash-image",
-    "gemini-2.0-flash-preview-image-generation",
 ]
 
 
@@ -69,7 +86,7 @@ class AIEnhanceDialog(QDialog):
         self.provider = QComboBox()
         self.provider.addItem("Pollinations (Free, no key)", "pollinations")
         self.provider.addItem("OpenRouter", "openrouter")
-        self.provider.addItem("Google Gemini (direct)", "gemini")
+        self.provider.addItem("Google Gemini / Nano Banana", "gemini")
         idx = self.provider.findData(config.provider)
         if idx >= 0:
             self.provider.setCurrentIndex(idx)
@@ -109,7 +126,9 @@ class AIEnhanceDialog(QDialog):
         gr_widget = self._wrap(gr_row)
         kf.addRow("Gemini:", gr_widget)
 
-        hint = QLabel("Gemini key: Google AI Studio → Get API key (https://aistudio.google.com/apikey)")
+        hint = QLabel(
+            "Google key: https://aistudio.google.com/apikey "
+        )
         hint.setWordWrap(True)
         kf.addRow("", hint)
         self.keys_group = keys_group
@@ -200,10 +219,13 @@ class AIEnhanceDialog(QDialog):
     def save_config(self):
         config.openrouter_key = self.openrouter_key.text().strip()
         config.gemini_key = self.gemini_key.text().strip()
-        config.provider = self.provider.currentData() or "openrouter"
-        config.openrouter_model = self.model.currentText().strip()
-        if self.provider.currentData() == "gemini":
-            config.gemini_model = self.model.currentText().strip()
+        provider = self.provider.currentData() or "openrouter"
+        config.provider = provider
+        model = self.model.currentText().strip()
+        if provider == "openrouter":
+            config.openrouter_model = model
+        elif provider == "gemini":
+            config.gemini_model = model
 
     def provider_id(self) -> str:
         return self.provider.currentData() or "openrouter"
