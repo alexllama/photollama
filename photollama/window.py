@@ -508,12 +508,14 @@ class MainWindow(QMainWindow):
         self._update_status()
 
     def next_image(self) -> None:
-        if self._paths and self._index < len(self._paths) - 1:
-            self._show_index(self._index + 1)
+        if not self._paths:
+            return
+        self._show_index((self._index + 1) % len(self._paths))
 
     def prev_image(self) -> None:
-        if self._paths and self._index > 0:
-            self._show_index(self._index - 1)
+        if not self._paths:
+            return
+        self._show_index((self._index - 1) % len(self._paths))
 
     def save(self) -> None:
         if self._doc is None or not self._doc.is_modified:
@@ -836,8 +838,8 @@ class MainWindow(QMainWindow):
             self.act_ai_enhance,
         ):
             action.setEnabled(has_doc)
-        self.act_next.setEnabled(self._index < len(self._paths) - 1)
-        self.act_prev.setEnabled(self._index > 0)
+        self.act_next.setEnabled(len(self._paths) > 1)
+        self.act_prev.setEnabled(len(self._paths) > 1)
         self.open_with_menu.setEnabled(has_doc)
         if self._rotate_session is not None:
             for action in (

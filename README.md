@@ -28,8 +28,8 @@ The inspiration for this app is Gwenview, but I wanted it to have the ability to
   `jpegtran`, so no re-encoding.
 - **File operations** — save, save as, move to trash, rename, open with, and a
   properties panel with EXIF metadata.
-- **Browsing** — arrow-key navigation through a folder with a `N of M` counter,
-  drag & drop, and single-instance "Open with" handling.
+- **Browsing** — arrow-key navigation through a folder with a `N of M` counter
+  (wrapping at the ends), drag & drop, and single-instance "Open with" handling.
 
 ## Requirements
 
@@ -100,7 +100,8 @@ python -m photollama ~/Pictures
 | Properties | `Ctrl+I` |
 | Quit | `Ctrl+Q` |
 
-Navigation moves one image per key press; holding an arrow key does not skip ahead.
+Navigation moves one image per key press and wraps around at the ends of the
+folder; holding an arrow key does not skip ahead.
 
 Choose **View > Grid Color…** to pick a color that stands out against the
 current image. **View > Reset Grid Color** returns to the theme's default color.
