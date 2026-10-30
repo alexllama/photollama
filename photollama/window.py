@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import re
 
-from PySide6.QtCore import QEvent, QRect, QSize, Qt
+from PySide6.QtCore import QEvent, QRect, QSettings, QSize, Qt
 from PySide6.QtGui import (
     QAction,
     QColor,
@@ -16,6 +16,7 @@ from PySide6.QtGui import (
 from PySide6.QtNetwork import QNetworkAccessManager
 from PySide6.QtWidgets import (
     QApplication,
+    QColorDialog,
     QDialog,
     QFileDialog,
     QInputDialog,
@@ -56,6 +57,9 @@ def _build_image_filter() -> str:
 
 IMAGE_FILTER = _build_image_filter()
 
+_SETTINGS_ORG = "photollama"
+_SETTINGS_APP = "photollama"
+
 
 class MainWindow(QMainWindow):
     def __init__(self, theme: Theme, parent=None):
@@ -88,6 +92,7 @@ class MainWindow(QMainWindow):
         self.top_bar.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.top_bar)
         self.canvas = Canvas(theme)
+        self.canvas.grid_color = self._load_grid_color()
         layout.addWidget(self.canvas, 1)
         self.setCentralWidget(central)
 
@@ -174,10 +179,12 @@ class MainWindow(QMainWindow):
 
         self.act_next = QAction("Next Image", self)
         self.act_next.setShortcuts([QKeySequence("Right"), QKeySequence("Space")])
+        self.act_next.setAutoRepeat(False)
         self.act_next.triggered.connect(self.next_image)
 
         self.act_prev = QAction("Previous Image", self)
         self.act_prev.setShortcuts([QKeySequence("Left"), QKeySequence("Backspace")])
+        self.act_prev.setAutoRepeat(False)
         self.act_prev.triggered.connect(self.prev_image)
 
         self.act_zoom_in = QAction("Zoom In", self)
@@ -199,12 +206,20 @@ class MainWindow(QMainWindow):
         self.act_thirds = QAction("Grid of Thirds", self)
         self.act_thirds.setCheckable(True)
         self.act_thirds.setShortcut("G")
+        self.act_thirds.setAutoRepeat(False)
         self.act_thirds.toggled.connect(self._toggle_thirds)
         self.act_thirds.setChecked(True)
+
+        self.act_grid_color = QAction("Grid Color…", self)
+        self.act_grid_color.triggered.connect(self.choose_grid_color)
+
+        self.act_grid_color_reset = QAction("Reset Grid Color", self)
+        self.act_grid_color_reset.triggered.connect(self.reset_grid_color)
 
         self.act_hist = QAction("Histogram", self)
         self.act_hist.setCheckable(True)
         self.act_hist.setShortcut("H")
+        self.act_hist.setAutoRepeat(False)
         self.act_hist.toggled.connect(self._toggle_histogram)
 
         self.act_quit = QAction("Quit", self)
@@ -218,7 +233,8 @@ class MainWindow(QMainWindow):
             self.act_rotate_angle, self.act_flip_h, self.act_flip_v, self.act_crop,
             self.act_levels, self.act_ai_enhance, self.act_next, self.act_prev,
             self.act_zoom_in, self.act_zoom_out, self.act_fit, self.act_actual,
-            self.act_thirds, self.act_hist, self.act_quit,
+            self.act_thirds, self.act_grid_color, self.act_grid_color_reset,
+            self.act_hist, self.act_quit,
         ):
             self.addAction(action)
 
@@ -264,6 +280,8 @@ class MainWindow(QMainWindow):
         view_menu.addAction(self.act_actual)
         view_menu.addSeparator()
         view_menu.addAction(self.act_thirds)
+        view_menu.addAction(self.act_grid_color)
+        view_menu.addAction(self.act_grid_color_reset)
         view_menu.addAction(self.act_hist)
 
         self._update_actions()
@@ -832,6 +850,17 @@ class MainWindow(QMainWindow):
                 action.setEnabled(False)
             self.open_with_menu.setEnabled(False)
 
+    @staticmethod
+    def _load_grid_color() -> QColor | None:
+        value = QSettings(_SETTINGS_ORG, _SETTINGS_APP).value("view/grid_color")
+        if isinstance(value, QColor):
+            return QColor(value) if value.isValid() else None
+        if value:
+            color = QColor(str(value))
+            if color.isValid():
+                return color
+        return None
+
     def _toggle_thirds(self, checked: bool) -> None:
         self.canvas.show_thirds = checked
         self.canvas.viewport().update()
@@ -839,6 +868,24 @@ class MainWindow(QMainWindow):
     def _toggle_histogram(self, checked: bool) -> None:
         self.canvas.show_histogram = checked
         self.canvas.viewport().update()
+
+    def choose_grid_color(self) -> None:
+        current = self.canvas.grid_color or self.theme.color("muted")
+        color = QColorDialog.getColor(current, self, "Grid Color")
+        if not color.isValid():
+            return
+        self.canvas.grid_color = color
+        self.canvas.viewport().update()
+        settings = QSettings(_SETTINGS_ORG, _SETTINGS_APP)
+        settings.setValue("view/grid_color", color.name())
+        settings.sync()
+
+    def reset_grid_color(self) -> None:
+        self.canvas.grid_color = None
+        self.canvas.viewport().update()
+        settings = QSettings(_SETTINGS_ORG, _SETTINGS_APP)
+        settings.remove("view/grid_color")
+        settings.sync()
 
 
     def ai_enhance_dialog(self) -> None:

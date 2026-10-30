@@ -54,6 +54,7 @@ class Canvas(QGraphicsView):
         self._rotate_start = 0.0
         self.show_thirds = True
         self.show_histogram = False
+        self.grid_color: QColor | None = None
         self.apply_theme()
 
     def apply_theme(self) -> None:
@@ -224,7 +225,11 @@ class Canvas(QGraphicsView):
 
     def _draw_thirds(self, painter: QPainter) -> None:
         rect = self.mapFromScene(self._item.sceneBoundingRect()).boundingRect()
-        color = self.theme.color("muted")
+        color = (
+            QColor(self.grid_color)
+            if self.grid_color is not None
+            else self.theme.color("muted")
+        )
         color.setAlpha(170)
         pen = QPen(color)
         pen.setCosmetic(True)

@@ -4,7 +4,7 @@ A fast, keyboard-driven image viewer for Linux, built with PySide6 (Qt6) and
 designed to blend into an [Omarchy](https://omarchy.org) / Hyprland desktop by
 reading the active theme's colors at runtime.
 
-The inspiration for this app is Gwenview, but I wanted it to have the ability to rotate to any angle. Also I tend to have issues with right and left arrow sometimes skipping two images at one time. 
+The inspiration for this app is Gwenview, but I wanted it to have the ability to rotate to any angle and reliable one-image-per-key navigation.
 
 ## Screenshot
 
@@ -18,7 +18,8 @@ The inspiration for this app is Gwenview, but I wanted it to have the ability to
   applies the palette to the UI and the image canvas, hot-reloading when you
   switch themes.
 - **Viewing** — zoom to cursor with the wheel, drag to pan, fit-to-window and
-  actual-size, a grid of thirds (on by default), and a toggleable RGB histogram.
+  actual-size, a grid of thirds (on by default, with a customizable color), and
+  a toggleable RGB histogram.
 - **Editing** — non-destructive: rotate 90°, rotate to any angle (with
   auto-crop), flip, crop with aspect-ratio presets, and a GIMP-style levels
   tool (input/output black, gamma and white points, per channel, with a live
@@ -98,6 +99,12 @@ python -m photollama ~/Pictures
 | Delete (to trash) | `Del` |
 | Properties | `Ctrl+I` |
 | Quit | `Ctrl+Q` |
+
+Navigation moves one image per key press; holding an arrow key does not skip ahead.
+
+Choose **View > Grid Color…** to pick a color that stands out against the
+current image. **View > Reset Grid Color** returns to the theme's default color.
+The chosen color is remembered between sessions.
 
 Mouse: the scroll wheel zooms toward the cursor, and dragging pans when zoomed
 in. In the crop dialog, drag the handles to resize and the interior to move.
