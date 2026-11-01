@@ -96,7 +96,7 @@ python -m photollama ~/Pictures
 | Grid of thirds | `G` |
 | Histogram | `H` |
 | Rename | `F2` |
-| Delete (to trash) | `Del` |
+| Delete (to trash) | `Del` / `D` |
 | Properties | `Ctrl+I` |
 | Quit | `Ctrl+Q` |
 

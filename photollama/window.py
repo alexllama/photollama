@@ -130,7 +130,7 @@ class MainWindow(QMainWindow):
         self.act_rename.triggered.connect(self.rename_current)
 
         self.act_delete = QAction("Delete", self)
-        self.act_delete.setShortcut(QKeySequence.Delete)
+        self.act_delete.setShortcuts([QKeySequence(QKeySequence.Delete), QKeySequence("D")])
         self.act_delete.triggered.connect(self.delete_current)
 
         self.act_properties = QAction("Properties", self)
