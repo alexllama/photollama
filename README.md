@@ -38,10 +38,12 @@ The inspiration for this app is Gwenview, but I wanted it to have the ability to
 - `jpegtran` (from `libjpeg-turbo`) for lossless JPEG rotation — optional
 - `gio` for moving files to the trash
 
+Clone this repo, then go to the folder where you cloned it.
+
 Install dependencies via Omarchy menus. If installing on Arch:
 
 ```sh
-sudo pacman -S pyside6 python-numpy libjpeg-turbo
+sudo pacman -S pyside6 python-numpy libjpeg-turbo glib2
 ```
 
 ## Install
@@ -59,6 +61,18 @@ This writes:
 - `~/.local/share/applications/photollama.desktop`
 - `~/.local/share/icons/hicolor/*/apps/photollama.png` (16–256 px)
 - `xdg-mime` defaults for JPEG, PNG, GIF, WebP, TIFF, BMP, SVG, ICO and JP2
+
+Then launch it:
+```sh
+photollama
+```
+or find Photollama in the application menu.
+
+A few notes:
+- install.sh creates ~/.local/bin/photollama, a desktop entry, icons, and makes Photollama the default handler for common image formats. If you don’t want it to replace your current image viewer, comment out the xdg-mime default ... loop before running it.
+- The launcher points at the checkout location, so if you move the photollama folder later, rerun ./install.sh.
+- Make sure ~/.local/bin is on your PATH.
+- Outside Arch/Omarchy, install PySide6, NumPy, jpegtran, and gio using your distro’s package manager. The app still works, but uses fallback colors if Omarchy’s theme file isn’t present.
 
 To uninstall, remove those files and reset the MIME defaults with your previous
 viewer (for example `xdg-mime default org.kde.gwenview.desktop image/jpeg`).
